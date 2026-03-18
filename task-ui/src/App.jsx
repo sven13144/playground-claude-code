@@ -2,12 +2,47 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle2, Circle, Plus, Trash2, X, Zap,
-  Activity, Filter, Sparkles, Terminal
+  Activity, Filter, Sparkles, Terminal, Wand2
 } from 'lucide-react'
 
 const API = '/odata/v4/api/Tasks'
+const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
 
 const headers = { 'Content-Type': 'application/json' }
+
+// ─── AI suggestion ───────────────────────────────────────────────────────────
+
+async function suggestTask() {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-client-side-keys-allowed': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [{
+        role: 'user',
+        content: `Generate a single creative, quirky task for an AI hackathon task board.
+Return ONLY valid JSON with exactly these two fields:
+{
+  "title": "short punchy task title (max 8 words, no emoji)",
+  "description": "a fun ASCII art scene (max 10 lines, under 200 chars) that visually represents the task — use box-drawing chars, symbols, emoji. Keep lines under 22 chars."
+}
+No explanation, no markdown fences, just the JSON object.`,
+      }],
+    }),
+  })
+  if (!res.ok) throw new Error(`Claude API ${res.status}`)
+  const data = await res.json()
+  const text = data.content[0].text.trim()
+  // strip any accidental markdown fences
+  const clean = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
+  return JSON.parse(clean)
+}
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -249,6 +284,16 @@ const s = {
     color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
     letterSpacing: 1, boxShadow: '0 0 20px rgba(124,58,237,0.4)',
   },
+  suggestBtn: (loading) => ({
+    background: loading
+      ? 'rgba(236,72,153,0.1)'
+      : 'linear-gradient(135deg,rgba(236,72,153,0.2),rgba(124,58,237,0.2))',
+    border: '1px solid rgba(236,72,153,0.5)',
+    borderRadius: 10, padding: '10px 20px', cursor: loading ? 'not-allowed' : 'pointer',
+    color: 'var(--magenta-glow)', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
+    letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6,
+    opacity: loading ? 0.7 : 1, transition: 'all 0.2s',
+  }),
   closeBtn: {
     position: 'absolute', top: 16, right: 16,
     background: 'none', border: 'none', cursor: 'pointer',
@@ -365,6 +410,7 @@ function AddModal({ onClose, onAdd }) {
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
   const [focused, setFocused] = useState(null)
+  const [suggesting, setSuggesting] = useState(false)
 
   const focusBorder = (field) => ({
     borderColor: focused === field ? 'var(--violet)' : 'var(--border)',
@@ -375,6 +421,20 @@ function AddModal({ onClose, onAdd }) {
     e.preventDefault()
     if (!title.trim()) return
     onAdd({ title: title.trim(), description: desc.trim() })
+  }
+
+  const handleSuggest = async () => {
+    if (suggesting) return
+    setSuggesting(true)
+    try {
+      const suggestion = await suggestTask()
+      setTitle(suggestion.title)
+      setDesc(suggestion.description)
+    } catch (err) {
+      console.error('Suggest failed:', err)
+    } finally {
+      setSuggesting(false)
+    }
   }
 
   return (
@@ -413,6 +473,19 @@ function AddModal({ onClose, onAdd }) {
 
           <div style={s.modalActions}>
             <button type="button" style={s.cancelBtn} onClick={onClose}>CANCEL</button>
+            <motion.button
+              type="button"
+              style={s.suggestBtn(suggesting)}
+              onClick={handleSuggest}
+              disabled={suggesting}
+              whileHover={suggesting ? {} : { scale: 1.03, boxShadow: '0 0 24px rgba(236,72,153,0.5)' }}
+              whileTap={suggesting ? {} : { scale: 0.97 }}>
+              {suggesting
+                ? <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                    style={{ display: 'inline-block' }}>✦</motion.span>
+                : <Wand2 size={13} />}
+              {suggesting ? 'ASKING AI…' : '✨ SUGGEST'}
+            </motion.button>
             <motion.button type="submit" style={s.submitBtn}
               whileHover={{ scale: 1.03, boxShadow: '0 0 28px rgba(124,58,237,0.6)' }}
               whileTap={{ scale: 0.97 }}>
