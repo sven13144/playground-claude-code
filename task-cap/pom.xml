@@ -41,4 +41,13 @@
         <module>srv</module>
     </modules>
 
+    <repositories>
+        <repository>
+            <id>central-langchain4j</id>
+            <url>https://repo1.maven.org/maven2</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+    </repositories>
+
 </project>

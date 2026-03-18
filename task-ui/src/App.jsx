@@ -12,16 +12,16 @@ const headers = { 'Content-Type': 'application/json' }
 
 // ─── AI suggestion ───────────────────────────────────────────────────────────
 
-async function suggestTask() {
+async function suggestTask(userPrompt = '') {
   const res = await fetch(SUGGEST_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: userPrompt }),
   })
   if (!res.ok) throw new Error(`suggestTask failed: ${res.status}`)
   const data = await res.json()
   return { title: data.title, description: data.description }
 }
-
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const uuid = () => crypto.randomUUID()
@@ -387,6 +387,7 @@ function TaskCard({ task, onToggle, onDelete }) {
 function AddModal({ onClose, onAdd }) {
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
+  const [prompt, setPrompt] = useState('')
   const [focused, setFocused] = useState(null)
   const [suggesting, setSuggesting] = useState(false)
 
@@ -405,7 +406,7 @@ function AddModal({ onClose, onAdd }) {
     if (suggesting) return
     setSuggesting(true)
     try {
-      const suggestion = await suggestTask()
+      const suggestion = await suggestTask(prompt)
       setTitle(suggestion.title)
       setDesc(suggestion.description)
     } catch (err) {
@@ -448,6 +449,12 @@ function AddModal({ onClose, onAdd }) {
             value={desc} onChange={e => setDesc(e.target.value)}
             onFocus={() => setFocused('desc')} onBlur={() => setFocused(null)}
             placeholder="ASCII art welcome..." />
+
+          <label style={s.label}>AI PROMPT HINT</label>
+          <input style={{ ...s.input, marginBottom: 24, ...focusBorder('prompt') }}
+            value={prompt} onChange={e => setPrompt(e.target.value)}
+            onFocus={() => setFocused('prompt')} onBlur={() => setFocused(null)}
+            placeholder="e.g. something about robots and coffee..." />
 
           <div style={s.modalActions}>
             <button type="button" style={s.cancelBtn} onClick={onClose}>CANCEL</button>
