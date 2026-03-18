@@ -26,3 +26,6 @@ hyperspace:
 
 agent:
   interval-ms: 10000
+
+monitor:
+  interval-ms: 2000

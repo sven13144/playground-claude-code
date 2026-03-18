@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/odata': 'http://localhost:8080',
+      '/events': { target: 'http://localhost:8080', changeOrigin: false },
     },
   },
 })

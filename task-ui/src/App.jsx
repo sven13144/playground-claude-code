@@ -510,6 +510,13 @@ export default function App() {
 
   useEffect(() => { loadTasks() }, [loadTasks])
 
+  useEffect(() => {
+    const es = new EventSource('/events')
+    es.addEventListener('tasks_changed', () => loadTasks())
+    es.onerror = (err) => console.warn('SSE error, browser will retry:', err)
+    return () => es.close()
+  }, [loadTasks])
+
   const handleToggle = async (task) => {
     const updated = { completed: !task.completed }
     setTasks(prev => prev.map(t => t.ID === task.ID ? { ...t, ...updated } : t))
