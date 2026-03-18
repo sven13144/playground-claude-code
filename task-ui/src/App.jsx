@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle2, Circle, Plus, Trash2, X, Zap,
-  Activity, Filter, Sparkles, Terminal, Wand2, HelpCircle, BarChart2
+  Activity, Filter, Sparkles, Terminal, Wand2, HelpCircle, BarChart2,
+  MessageCircle, Send
 } from 'lucide-react'
 
 const API = '/odata/v4/api/Tasks'
 const SUGGEST_API = '/odata/v4/api/suggestTask'
+const CHAT_API = '/odata/v4/api/chatTask'
 
 const headers = { 'Content-Type': 'application/json' }
 
@@ -361,6 +363,70 @@ const s = {
     display: 'flex', alignItems: 'center', gap: 8,
     boxShadow: `0 0 24px ${type === 'error' ? 'rgba(236,72,153,0.3)' : 'rgba(16,185,129,0.3)'}`,
   }),
+
+  // ── chat ──
+  chatBubble: {
+    position: 'fixed', bottom: 32, right: 32, zIndex: 50,
+    width: 52, height: 52, borderRadius: '50%', border: 'none', cursor: 'pointer',
+    background: 'linear-gradient(135deg,var(--violet),var(--cyan))',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 0 24px rgba(124,58,237,0.5), 0 0 48px rgba(6,182,212,0.2)',
+  },
+  chatPanel: {
+    position: 'fixed', bottom: 100, right: 32, zIndex: 50,
+    width: 380, height: 520,
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 20, display: 'flex', flexDirection: 'column',
+    boxShadow: '0 0 60px rgba(124,58,237,0.25)',
+    overflow: 'hidden',
+  },
+  chatHeader: {
+    padding: '16px 20px',
+    borderBottom: '1px solid var(--border)',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    position: 'relative', flexShrink: 0,
+  },
+  chatMessages: {
+    flex: 1, overflowY: 'auto', padding: '16px',
+    display: 'flex', flexDirection: 'column', gap: 10,
+  },
+  chatMsgUser: {
+    alignSelf: 'flex-end', maxWidth: '80%',
+    background: 'rgba(124,58,237,0.25)',
+    border: '1px solid rgba(124,58,237,0.4)',
+    borderRadius: '12px 12px 4px 12px',
+    padding: '8px 12px',
+    fontFamily: 'var(--font-mono)', fontSize: 12,
+    color: 'var(--violet-glow)',
+  },
+  chatMsgBot: {
+    alignSelf: 'flex-start', maxWidth: '85%',
+    background: 'var(--surface2)',
+    border: '1px solid var(--border)',
+    borderRadius: '12px 12px 12px 4px',
+    padding: '8px 12px',
+    fontFamily: 'var(--font-mono)', fontSize: 12,
+    color: 'var(--cyan-glow)',
+  },
+  chatInputRow: {
+    padding: '12px 16px',
+    borderTop: '1px solid var(--border)',
+    display: 'flex', gap: 8, flexShrink: 0,
+  },
+  chatInput: {
+    flex: 1, background: 'var(--surface2)',
+    border: '1px solid var(--border)', borderRadius: 10,
+    padding: '10px 14px', color: 'var(--text)',
+    fontFamily: 'var(--font-mono)', fontSize: 12,
+    outline: 'none',
+  },
+  chatSendBtn: (disabled) => ({
+    background: disabled ? 'rgba(124,58,237,0.2)' : 'linear-gradient(135deg,var(--violet),var(--cyan))',
+    border: 'none', borderRadius: 10, padding: '10px 14px', cursor: disabled ? 'not-allowed' : 'pointer',
+    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    opacity: disabled ? 0.5 : 1,
+  }),
 }
 
 // ─── components ─────────────────────────────────────────────────────────────
@@ -565,43 +631,47 @@ const ARCH = `\
 │  │  loadTasks()        │    │  new EventSource('/events')      │   │
 │  │  GET /odata/v4/...  │    │  on 'tasks_changed' → loadTasks()│   │
 │  └──────────┬──────────┘    └───────────────┬──────────────────┘   │
-└─────────────┼───────────────────────────────┼─────────────────────-┘
-              │  Vite proxy                   │  Vite proxy
-              │  /odata → :8080               │  /events → :8080
-              ▼                               ▼
+│                                                                     │
+│  ChatModal (floating, bottom-right)                                 │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │  user types natural-language command                         │  │
+│  │  POST /odata/v4/api/chatTask  { message, taskList JSON }     │  │
+│  │  ← { response, action, taskId, title, description }         │  │
+│  │  handleChatAction → doAdd / handleToggle / handleDelete      │  │
+│  └──────────────────────────┬───────────────────────────────────┘  │
+└─────────────────────────────┼───────────────────────────────────────┘
+              Vite proxy       │  /odata → :8080  /events → :8080
+                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                  Spring Boot CAP Java (:8080)                       │
 │                                                                     │
 │  ┌──────────────────────┐    ┌──────────────────────────────────┐  │
 │  │  CdsODataV4Servlet   │    │  SseController                   │  │
 │  │  /odata/v4/api/Tasks │    │  GET /events                     │  │
-│  │  (CRUD via CAP)      │    │  → SseEmitterRegistry.register() │  │
-│  └──────────┬───────────┘    └───────────────┬──────────────────┘  │
-│             │ reads/writes                   │ holds open          │
-│             ▼                                ▼                     │
-│  ┌──────────────────┐        ┌──────────────────────────────────┐  │
-│  │   H2 in-memory   │        │  SseEmitterRegistry              │  │
-│  │   (Tasks table)  │        │  CopyOnWriteArrayList<Emitter>   │  │
-│  └──────────────────┘        └───────────────▲──────────────────┘  │
-│                                              │ broadcast()         │
-│  ┌───────────────────────────────────────────┴──────────────────┐  │
-│  │  TaskAgentScheduler (10s)   CompleterAgentScheduler (~10s)   │  │
-│  │  generate → refine          fetch → pick one at random        │  │
-│  │         → POST task         → PATCH completed=true            │  │
-│  │  (Claude via HAI proxy)       + completedAt=now()             │  │
-│  │                             (LangChain4j + Claude via HAI)   │  │
-│  │                                                              │  │
-│  │  MonitorAgentScheduler (2s)                                  │  │
-│  │  snapshot: GET /odata/v4/api/Tasks                           │  │
-│  │    compare body vs previousSnapshot (AtomicReference)        │  │
-│  │      changed? → broadcast("tasks_changed") ─────────────────┘  │
-│  │      same?    → no-op                                           │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                                                                     │
-│  Stats (browser-side only, no extra endpoint):                      │
-│  StatsModal reads createdAt + completedAt from task list →          │
-│  avg/min/max duration, bar charts per day, full task table          │
-└───────────────────────────────────┬─────────────────────────────────┘
+│  │  /odata/v4/api/      │    │  → SseEmitterRegistry.register() │  │
+│  │    suggestTask        │    └───────────────┬──────────────────┘  │
+│  │    chatTask  ◄────────┼─── ChatTaskHandler │ holds open          │
+│  │  (CRUD + actions)    │    │                ▼                     │
+│  └──────────┬───────────┘    │  ┌──────────────────────────────┐   │
+│             │ reads/writes   │  │  SseEmitterRegistry          │   │
+│             ▼                │  │  CopyOnWriteArrayList        │   │
+│  ┌──────────────────┐        │  └──────────────▲───────────────┘   │
+│  │   H2 in-memory   │        │                 │ broadcast()        │
+│  │   (Tasks table)  │        └─────────────────┼────────────────┐  │
+│  └──────────────────┘                          │                │  │
+│                                                │                │  │
+│  ┌─────────────────────────────────────────────┴────────────┐   │  │
+│  │  TaskAgentScheduler (10s)   CompleterAgentScheduler (~10s)│   │  │
+│  │  generate → refine          fetch → pick one at random    │   │  │
+│  │         → POST task         → PATCH completed=true        │   │  │
+│  │                               + completedAt=now()         │   │  │
+│  │  MonitorAgentScheduler (2s)                               │   │  │
+│  │  snapshot GET → compare → broadcast("tasks_changed") ─────┘   │  │
+│  └───────────────────────────────────────────────────────────┘   │  │
+│                                                                   │  │
+│  Stats (browser-side only):  StatsModal reads createdAt +         │  │
+│  completedAt → avg/min/max duration, bar charts, task table       │  │
+└───────────────────────────────────┬───────────────────────────────┘
                                     │ HTTP (LangChain4j)
                                     ▼
                        ┌─────────────────────────┐
@@ -609,6 +679,105 @@ const ARCH = `\
                        │  localhost:6655          │
                        │  → Anthropic Claude API  │
                        └─────────────────────────┘`
+
+function ChatModal({ tasks, onTaskAction, onClose }) {
+  const [messages, setMessages] = useState([
+    { role: 'bot', text: 'Hi! I can create, complete, reopen or delete tasks. What would you like to do?' }
+  ])
+  const [input, setInput] = useState('')
+  const [thinking, setThinking] = useState(false)
+  const messagesEndRef = useRef(null)
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const submit = async () => {
+    const text = input.trim()
+    if (!text || thinking) return
+    setMessages(prev => [...prev, { role: 'user', text }])
+    setInput('')
+    setThinking(true)
+    try {
+      const taskList = JSON.stringify(tasks.map(t => ({ ID: t.ID, title: t.title, completed: t.completed })))
+      const res = await fetch(CHAT_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, taskList }),
+      })
+      if (!res.ok) throw new Error(`chatTask failed: ${res.status}`)
+      const result = await res.json()
+      setMessages(prev => [...prev, { role: 'bot', text: result.response || '(no response)' }])
+      if (result.action && result.action !== 'none') {
+        onTaskAction(result.action, result)
+      }
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'bot', text: `Error: ${err.message}` }])
+    } finally {
+      setThinking(false)
+    }
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() }
+    if (e.key === 'Escape') onClose()
+  }
+
+  return (
+    <motion.div style={s.chatPanel}
+      initial={{ opacity: 0, scale: 0.92, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.92, y: 20 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 28 }}>
+
+      {/* shimmer top border */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, zIndex: 1,
+        background: 'linear-gradient(90deg,transparent,var(--violet),var(--cyan),transparent)' }} />
+
+      {/* header */}
+      <div style={s.chatHeader}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+          background: 'linear-gradient(90deg,var(--violet-glow),var(--cyan-glow))',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          // CHAT_ASSISTANT
+        </div>
+        <button style={s.closeBtn} onClick={onClose}><X size={16} /></button>
+      </div>
+
+      {/* messages */}
+      <div style={s.chatMessages}>
+        {messages.map((msg, i) => (
+          <div key={i} style={msg.role === 'user' ? s.chatMsgUser : s.chatMsgBot}>
+            {msg.text}
+          </div>
+        ))}
+        {thinking && (
+          <motion.div style={s.chatMsgBot}
+            animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.2 }}>
+            thinking…
+          </motion.div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* input row */}
+      <div style={s.chatInputRow}>
+        <input
+          style={s.chatInput}
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Type a command…"
+          autoFocus
+          disabled={thinking}
+        />
+        <button style={s.chatSendBtn(thinking || !input.trim())} onClick={submit} disabled={thinking || !input.trim()}>
+          <Send size={14} />
+        </button>
+      </div>
+    </motion.div>
+  )
+}
 
 function HelpModal({ onClose }) {
   return (
@@ -635,6 +804,9 @@ function HelpModal({ onClose }) {
           Three LangGraph4j agents run on a schedule inside the Spring Boot server.
           The UI subscribes to a Server-Sent Events stream and reloads tasks automatically
           whenever an agent modifies the database — no manual refresh needed.
+          A floating chat bubble (bottom-right) lets you create, complete, reopen or delete tasks
+          using plain English — the command is routed through a CAP action to Claude, which
+          interprets the intent and returns a structured response the UI acts on immediately.
           The STATS button shows timing analytics computed entirely in the browser
           from the createdAt and completedAt fields returned by OData.
         </p>
@@ -648,7 +820,8 @@ function HelpModal({ onClose }) {
           2. <strong style={{ color: 'var(--cyan-glow)' }}>CompleterAgent</strong> (every ~10s) — fetches pending tasks, picks one at random, PATCHes completed=true and completedAt=now().{'\n'}
           3. <strong style={{ color: 'var(--green-glow)' }}>MonitorAgent</strong> (every 2s) — GETs all tasks, compares the response body to the previous snapshot. On any difference it calls broadcast(), which pushes a tasks_changed SSE event to every connected browser tab.{'\n'}
           4. The browser EventSource receives the event and calls loadTasks(), keeping the UI in sync.{'\n'}
-          5. <strong style={{ color: 'var(--magenta-glow)' }}>StatsModal</strong> — clicking STATS opens a panel that derives avg/min/max open duration, per-day bar charts, and a full task table from the live task list (createdAt → completedAt). No extra API call needed.
+          5. <strong style={{ color: 'var(--magenta-glow)' }}>Chat panel</strong> — type a natural-language command ("create a task to fix login", "mark it as done", "delete Buy groceries"). The current task list is sent as JSON context alongside your message to the chatTask CAP action, which calls Claude and returns {'{action, taskId, title, …}'}. The UI then executes the OData operation directly.{'\n'}
+          6. <strong style={{ color: 'var(--text-muted)' }}>StatsModal</strong> — clicking STATS opens a panel that derives avg/min/max open duration, per-day bar charts, and a full task table from the live task list (createdAt → completedAt). No extra API call needed.
         </p>
 
         <div style={s.helpSection}>Stack</div>
@@ -835,6 +1008,7 @@ export default function App() {
   const [showModal, setShowModal] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [showStats, setShowStats] = useState(false)
+  const [showChat, setShowChat] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
 
@@ -891,8 +1065,7 @@ export default function App() {
     }
   }
 
-  const handleAdd = async ({ title, description }) => {
-    setShowModal(false)
+  const doAdd = async ({ title, description }) => {
     const newTask = { ID: uuid(), title, description, completed: false }
     setTasks(prev => [newTask, ...prev])
     try {
@@ -902,6 +1075,25 @@ export default function App() {
     } catch {
       setTasks(prev => prev.filter(t => t.ID !== newTask.ID))
       notify('Create failed', 'error')
+    }
+  }
+
+  const handleAdd = async ({ title, description }) => {
+    setShowModal(false)
+    await doAdd({ title, description })
+  }
+
+  const handleChatAction = (action, payload) => {
+    if (action === 'create') {
+      doAdd({ title: payload.title || 'New Task', description: payload.description || '' })
+    } else if (action === 'complete') {
+      const task = tasks.find(t => t.ID === payload.taskId)
+      if (task && !task.completed) handleToggle(task)
+    } else if (action === 'reopen') {
+      const task = tasks.find(t => t.ID === payload.taskId)
+      if (task && task.completed) handleToggle(task)
+    } else if (action === 'delete') {
+      if (payload.taskId) handleDelete(payload.taskId)
     }
   }
 
@@ -1020,6 +1212,26 @@ export default function App() {
       <AnimatePresence>
         {toast && <Toast key={toast.message} message={toast.message} type={toast.type} />}
       </AnimatePresence>
+
+      {/* chat panel */}
+      <AnimatePresence>
+        {showChat && (
+          <ChatModal
+            tasks={tasks}
+            onTaskAction={handleChatAction}
+            onClose={() => setShowChat(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* chat bubble */}
+      <motion.button
+        style={s.chatBubble}
+        onClick={() => setShowChat(v => !v)}
+        whileHover={{ scale: 1.1, boxShadow: '0 0 36px rgba(124,58,237,0.7), 0 0 64px rgba(6,182,212,0.3)' }}
+        whileTap={{ scale: 0.93 }}>
+        {showChat ? <X size={22} color="#fff" /> : <MessageCircle size={22} color="#fff" />}
+      </motion.button>
     </div>
   )
 }

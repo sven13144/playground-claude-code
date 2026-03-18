@@ -7,4 +7,12 @@ service TaskService @(path: '/api') {
         title       : String;
         description : String;
     };
+
+    action chatTask(message : String, taskList : String) returns {
+        response    : String;
+        action      : String;
+        taskId      : String;
+        title       : String;
+        description : String;
+    };
 }
