@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle2, Circle, Plus, Trash2, X, Zap,
-  Activity, Filter, Sparkles, Terminal, Wand2
+  Activity, Filter, Sparkles, Terminal, Wand2, HelpCircle
 } from 'lucide-react'
 
 const API = '/odata/v4/api/Tasks'
@@ -277,6 +277,37 @@ const s = {
     background: 'none', border: 'none', cursor: 'pointer',
     color: 'var(--text-muted)',
   },
+  helpBtn: {
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 10, padding: '6px 14px', cursor: 'pointer',
+    color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12,
+    fontWeight: 700, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6,
+    transition: 'all 0.2s',
+  },
+  helpModal: {
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 20, padding: 32, width: '100%', maxWidth: 760,
+    position: 'relative',
+    boxShadow: '0 0 60px rgba(124,58,237,0.25)',
+    maxHeight: '85vh', overflowY: 'auto',
+  },
+  pre: {
+    fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.5,
+    color: 'var(--cyan-glow)', background: 'var(--surface2)',
+    border: '1px solid var(--border)', borderRadius: 10,
+    padding: '16px 20px', overflowX: 'auto', whiteSpace: 'pre',
+    marginBottom: 20,
+  },
+  helpSection: {
+    fontFamily: 'var(--font-mono)', fontSize: 11,
+    color: 'var(--text-muted)', letterSpacing: 1,
+    marginBottom: 8, textTransform: 'uppercase',
+  },
+  helpPara: {
+    fontFamily: 'var(--font-mono)', fontSize: 12,
+    color: 'var(--text)', lineHeight: 1.7, marginBottom: 16,
+  },
 
   // ── toast ──
   toast: (type) => ({
@@ -483,12 +514,109 @@ function AddModal({ onClose, onAdd }) {
   )
 }
 
+const ARCH = `\
+┌─────────────────────────────────────────────────────────────────────┐
+│                     Browser (Vite :5173)                            │
+│                                                                     │
+│  App.jsx                                                            │
+│  ┌─────────────────────┐    ┌──────────────────────────────────┐   │
+│  │  useEffect (mount)  │    │  useEffect (SSE)                 │   │
+│  │  loadTasks()        │    │  new EventSource('/events')      │   │
+│  │  GET /odata/v4/...  │    │  on 'tasks_changed' → loadTasks()│   │
+│  └──────────┬──────────┘    └───────────────┬──────────────────┘   │
+└─────────────┼───────────────────────────────┼─────────────────────-┘
+              │  Vite proxy                   │  Vite proxy
+              │  /odata → :8080               │  /events → :8080
+              ▼                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                  Spring Boot CAP Java (:8080)                       │
+│                                                                     │
+│  ┌──────────────────────┐    ┌──────────────────────────────────┐  │
+│  │  CdsODataV4Servlet   │    │  SseController                   │  │
+│  │  /odata/v4/api/Tasks │    │  GET /events                     │  │
+│  │  (CRUD via CAP)      │    │  → SseEmitterRegistry.register() │  │
+│  └──────────┬───────────┘    └───────────────┬──────────────────┘  │
+│             │ reads/writes                   │ holds open          │
+│             ▼                                ▼                     │
+│  ┌──────────────────┐        ┌──────────────────────────────────┐  │
+│  │   H2 in-memory   │        │  SseEmitterRegistry              │  │
+│  │   (Tasks table)  │        │  CopyOnWriteArrayList<Emitter>   │  │
+│  └──────────────────┘        └───────────────▲──────────────────┘  │
+│                                              │ broadcast()         │
+│  ┌───────────────────────────────────────────┴──────────────────┐  │
+│  │  TaskAgentScheduler (10s)   CompleterAgentScheduler (~10s)   │  │
+│  │  generate → refine          fetch → pick → PATCH completed   │  │
+│  │         → POST task         (LangChain4j + Claude via HAI)   │  │
+│  │                                                              │  │
+│  │  MonitorAgentScheduler (2s)                                  │  │
+│  │  snapshot: GET /odata/v4/api/Tasks                           │  │
+│  │    compare body vs previousSnapshot (AtomicReference)        │  │
+│  │      changed? → broadcast("tasks_changed") ─────────────────┘  │
+│  │      same?    → no-op                                           │
+│  └──────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────┬─────────────────────────────────┘
+                                    │ HTTP (LangChain4j)
+                                    ▼
+                       ┌─────────────────────────┐
+                       │  Hyperspace AI Proxy     │
+                       │  localhost:6655          │
+                       │  → Anthropic Claude API  │
+                       └─────────────────────────┘`
+
+function HelpModal({ onClose }) {
+  return (
+    <motion.div style={s.backdrop}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <motion.div style={s.helpModal}
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 28 }}>
+
+        <div style={{ position: 'absolute', inset: 0, borderRadius: 20, overflow: 'hidden', pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+            background: 'linear-gradient(90deg,transparent,var(--violet),var(--cyan),transparent)' }} />
+        </div>
+
+        <button style={s.closeBtn} onClick={onClose}><X size={18} /></button>
+
+        <div style={s.modalTitle}>// ARCHITECTURE</div>
+
+        <div style={s.helpSection}>System Overview</div>
+        <p style={s.helpPara}>
+          Three LangGraph4j agents run on a schedule inside the Spring Boot server.
+          The UI subscribes to a Server-Sent Events stream and reloads tasks automatically
+          whenever an agent modifies the database — no manual refresh needed.
+        </p>
+
+        <div style={s.helpSection}>Architecture Diagram</div>
+        <pre style={s.pre}>{ARCH}</pre>
+
+        <div style={s.helpSection}>Data Flow</div>
+        <p style={s.helpPara}>
+          1. <strong style={{ color: 'var(--violet-glow)' }}>TaskAgent</strong> (every 10s) — asks Claude to brainstorm a hackathon task, refines it so the title starts with "AI ", then POSTs it via OData.{'\n'}
+          2. <strong style={{ color: 'var(--cyan-glow)' }}>CompleterAgent</strong> (every ~10s) — fetches pending tasks, picks one at random, PATCHes it as completed.{'\n'}
+          3. <strong style={{ color: 'var(--green-glow)' }}>MonitorAgent</strong> (every 2s) — GETs all tasks, compares the response body to the previous snapshot. On any difference it calls broadcast(), which pushes a tasks_changed SSE event to every connected browser tab.{'\n'}
+          4. The browser EventSource receives the event and calls loadTasks(), keeping the UI in sync.
+        </p>
+
+        <div style={s.helpSection}>Stack</div>
+        <p style={{ ...s.helpPara, marginBottom: 0 }}>
+          SAP CAP Java 2.6.0 · Spring Boot 3.2 · H2 in-memory · LangGraph4j 1.8.10 · LangChain4j 1.0.0-beta3 · React 18 · Vite · Framer Motion
+        </p>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // ─── main app ───────────────────────────────────────────────────────────────
 
 export default function App() {
   const [tasks, setTasks] = useState([])
   const [filter, setFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
 
@@ -582,7 +710,15 @@ export default function App() {
               <div style={s.subtitle}>SAP CAP · ODATA V4 · REACT</div>
             </div>
           </div>
-          <div style={s.badge}>⚡ AI HACKATHON</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <motion.button style={s.helpBtn}
+              onClick={() => setShowHelp(true)}
+              whileHover={{ scale: 1.04, borderColor: 'var(--violet)', color: 'var(--violet-glow)' }}
+              whileTap={{ scale: 0.96 }}>
+              <HelpCircle size={13} /> HELP
+            </motion.button>
+            <div style={s.badge}>⚡ AI HACKATHON</div>
+          </div>
         </header>
 
         {/* stats */}
@@ -636,6 +772,11 @@ export default function App() {
           </motion.div>
         )}
       </div>
+
+      {/* modals */}
+      <AnimatePresence>
+        {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      </AnimatePresence>
 
       {/* modal */}
       <AnimatePresence>
