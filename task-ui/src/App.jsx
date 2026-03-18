@@ -1094,6 +1094,11 @@ export default function App() {
       if (task && task.completed) handleToggle(task)
     } else if (action === 'delete') {
       if (payload.taskId) handleDelete(payload.taskId)
+    } else if (action === 'deleteAll') {
+      // taskId field contains a JSON-array-like string: [uuid1,uuid2,...]
+      const raw = payload.taskId || ''
+      const ids = raw.replace(/^\[|\]$/g, '').split(',').map(s => s.trim()).filter(Boolean)
+      ids.forEach(id => handleDelete(id))
     }
   }
 

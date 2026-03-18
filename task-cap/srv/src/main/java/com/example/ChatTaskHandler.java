@@ -17,6 +17,8 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 @ServiceName(TaskService_.CDS_NAME)
 public class ChatTaskHandler implements EventHandler {
@@ -34,7 +36,7 @@ public class ChatTaskHandler implements EventHandler {
 
     // ── LangChain4j structured output ────────────────────────────────────────
 
-    record ChatResult(String response, String action, String taskId, String title, String description) {}
+    record ChatResult(String response, String action, String taskId, List<String> taskIds, String title, String description) {}
 
     interface TaskChat {
         @SystemMessage("""
@@ -42,10 +44,13 @@ public class ChatTaskHandler implements EventHandler {
                 and a JSON list of current tasks. Decide what to do and respond with a JSON object
                 containing exactly these fields:
                   "response"    - a friendly one-sentence confirmation message
-                  "action"      - one of: create, complete, reopen, delete, none
+                  "action"      - one of: create, complete, reopen, delete, deleteAll, none
                   "taskId"      - the UUID of the task to act on (for complete/reopen/delete), or null
+                  "taskIds"     - list of UUIDs to delete (for deleteAll), or null
                   "title"       - the title of the new task (for create), or null
                   "description" - the description of the new task (for create), or null
+                Use deleteAll when the user wants to delete multiple or all tasks.
+                Populate taskIds with the IDs of every matching task from the taskList.
                 Always return valid JSON. Match tasks by title (case-insensitive substring match).
                 """)
         @UserMessage("""
@@ -78,10 +83,18 @@ public class ChatTaskHandler implements EventHandler {
 
         ChatResult result = chat.chat(taskList, message);
 
+        // For deleteAll, serialize taskIds list as JSON array into taskId field
+        String taskIdValue = result.taskId();
+        if ("deleteAll".equals(result.action()) && result.taskIds() != null && !result.taskIds().isEmpty()) {
+            taskIdValue = result.taskIds().stream()
+                .collect(java.util.stream.Collectors.joining(",", "[", "]"))
+                .replace("\"", "");
+        }
+
         ChatTaskContext.ReturnType ret = ChatTaskContext.ReturnType.create();
         ret.setResponse(result.response());
         ret.setAction(result.action());
-        ret.setTaskId(result.taskId());
+        ret.setTaskId(taskIdValue);
         ret.setTitle(result.title());
         ret.setDescription(result.description());
         ctx.setResult(ret);
