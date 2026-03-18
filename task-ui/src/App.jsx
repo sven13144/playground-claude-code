@@ -6,42 +6,20 @@ import {
 } from 'lucide-react'
 
 const API = '/odata/v4/api/Tasks'
-const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
+const SUGGEST_API = '/odata/v4/api/suggestTask'
 
 const headers = { 'Content-Type': 'application/json' }
 
 // ─── AI suggestion ───────────────────────────────────────────────────────────
 
 async function suggestTask() {
-  const res = await fetch('/llm/v1/messages', {
+  const res = await fetch(SUGGEST_API, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-client-side-keys-allowed': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
-      messages: [{
-        role: 'user',
-        content: `Generate a single creative, quirky task for an AI hackathon task board.
-Return ONLY valid JSON with exactly these two fields:
-{
-  "title": "short punchy task title (max 8 words, no emoji)",
-  "description": "a fun ASCII art scene (max 10 lines, under 200 chars) that visually represents the task — use box-drawing chars, symbols, emoji. Keep lines under 22 chars."
-}
-No explanation, no markdown fences, just the JSON object.`,
-      }],
-    }),
+    headers: { 'Content-Type': 'application/json' },
   })
-  if (!res.ok) throw new Error(`Claude API ${res.status}`)
+  if (!res.ok) throw new Error(`suggestTask failed: ${res.status}`)
   const data = await res.json()
-  const text = data.content[0].text.trim()
-  // strip any accidental markdown fences
-  const clean = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
-  return JSON.parse(clean)
+  return { title: data.title, description: data.description }
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
