@@ -6,6 +6,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/odata': 'http://localhost:8080',
+      '/llm': {
+        target: 'http://localhost:6655',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/llm/, '/anthropic'),
+      },
     },
   },
 })
