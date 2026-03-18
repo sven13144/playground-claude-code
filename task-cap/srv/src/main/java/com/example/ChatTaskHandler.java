@@ -52,6 +52,7 @@ public class ChatTaskHandler implements EventHandler {
                 Use deleteAll when the user wants to delete multiple or all tasks.
                 Populate taskIds with the IDs of every matching task from the taskList.
                 Always return valid JSON. Match tasks by title (case-insensitive substring match).
+                IMPORTANT: Return ONLY raw JSON. No markdown, no code fences, no explanation.
                 """)
         @UserMessage("""
                 taskList: {{taskList}}
@@ -70,7 +71,7 @@ public class ChatTaskHandler implements EventHandler {
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .modelName(model)
-                .maxTokens(400)
+                .maxTokens(4096)
                 .build();
 
         chat = AiServices.create(TaskChat.class, llm);
