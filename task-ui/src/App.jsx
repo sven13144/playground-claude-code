@@ -586,8 +586,10 @@ const ARCH = `\
 │                                              │ broadcast()         │
 │  ┌───────────────────────────────────────────┴──────────────────┐  │
 │  │  TaskAgentScheduler (10s)   CompleterAgentScheduler (~10s)   │  │
-│  │  generate → refine          fetch → pick → PATCH completed   │  │
-│  │         → POST task         (LangChain4j + Claude via HAI)   │  │
+│  │  generate → refine          fetch → pick one at random        │  │
+│  │         → POST task         → PATCH completed=true            │  │
+│  │  (Claude via HAI proxy)       + completedAt=now()             │  │
+│  │                             (LangChain4j + Claude via HAI)   │  │
 │  │                                                              │  │
 │  │  MonitorAgentScheduler (2s)                                  │  │
 │  │  snapshot: GET /odata/v4/api/Tasks                           │  │
@@ -595,6 +597,10 @@ const ARCH = `\
 │  │      changed? → broadcast("tasks_changed") ─────────────────┘  │
 │  │      same?    → no-op                                           │
 │  └──────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  Stats (browser-side only, no extra endpoint):                      │
+│  StatsModal reads createdAt + completedAt from task list →          │
+│  avg/min/max duration, bar charts per day, full task table          │
 └───────────────────────────────────┬─────────────────────────────────┘
                                     │ HTTP (LangChain4j)
                                     ▼
@@ -629,6 +635,8 @@ function HelpModal({ onClose }) {
           Three LangGraph4j agents run on a schedule inside the Spring Boot server.
           The UI subscribes to a Server-Sent Events stream and reloads tasks automatically
           whenever an agent modifies the database — no manual refresh needed.
+          The STATS button shows timing analytics computed entirely in the browser
+          from the createdAt and completedAt fields returned by OData.
         </p>
 
         <div style={s.helpSection}>Architecture Diagram</div>
@@ -636,10 +644,11 @@ function HelpModal({ onClose }) {
 
         <div style={s.helpSection}>Data Flow</div>
         <p style={s.helpPara}>
-          1. <strong style={{ color: 'var(--violet-glow)' }}>TaskAgent</strong> (every 10s) — asks Claude to brainstorm a hackathon task, refines it so the title starts with "AI ", then POSTs it via OData.{'\n'}
-          2. <strong style={{ color: 'var(--cyan-glow)' }}>CompleterAgent</strong> (every ~10s) — fetches pending tasks, picks one at random, PATCHes it as completed.{'\n'}
+          1. <strong style={{ color: 'var(--violet-glow)' }}>TaskAgent</strong> (every 10s) — asks Claude to brainstorm a hackathon task, refines it so the title starts with "AI ", then POSTs it via OData. CAP sets createdAt automatically.{'\n'}
+          2. <strong style={{ color: 'var(--cyan-glow)' }}>CompleterAgent</strong> (every ~10s) — fetches pending tasks, picks one at random, PATCHes completed=true and completedAt=now().{'\n'}
           3. <strong style={{ color: 'var(--green-glow)' }}>MonitorAgent</strong> (every 2s) — GETs all tasks, compares the response body to the previous snapshot. On any difference it calls broadcast(), which pushes a tasks_changed SSE event to every connected browser tab.{'\n'}
-          4. The browser EventSource receives the event and calls loadTasks(), keeping the UI in sync.
+          4. The browser EventSource receives the event and calls loadTasks(), keeping the UI in sync.{'\n'}
+          5. <strong style={{ color: 'var(--magenta-glow)' }}>StatsModal</strong> — clicking STATS opens a panel that derives avg/min/max open duration, per-day bar charts, and a full task table from the live task list (createdAt → completedAt). No extra API call needed.
         </p>
 
         <div style={s.helpSection}>Stack</div>
