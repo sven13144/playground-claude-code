@@ -23,3 +23,6 @@ hyperspace:
   proxy-url: http://localhost:6655/anthropic/v1/messages
   api-key: 69f05b9c-69ba-4da0-8b72-9adb9d20c895
   model: claude-haiku-4-5-20251001
+
+agent:
+  interval-ms: 10000

@@ -71,12 +71,24 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>
-            <version>0.36.2</version>
+            <version>1.0.0-beta3</version>
         </dependency>
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-anthropic</artifactId>
-            <version>0.36.2</version>
+            <version>1.0.0-beta3</version>
+        </dependency>
+
+        <!-- LangGraph4j agent framework -->
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-core</artifactId>
+            <version>1.8.10</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-langchain4j</artifactId>
+            <version>1.8.10</version>
         </dependency>
 
         <!-- Test -->
