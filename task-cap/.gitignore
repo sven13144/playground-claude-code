@@ -1,0 +1,5 @@
+target/
+node_modules/
+srv/src/gen/
+*.class
+*.jar

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>task-cap</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>task-cap-srv</artifactId>
+    <packaging>jar</packaging>
+    <name>task-cap-srv</name>
+
+    <dependencies>
+        <!-- CAP Spring Boot starter -->
+        <dependency>
+            <groupId>com.sap.cds</groupId>
+            <artifactId>cds-framework-spring-boot</artifactId>
+        </dependency>
+
+        <!-- Spring Web (Tomcat) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Spring JDBC (DataSource + TransactionManager auto-config) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
+        <!-- CAP services API -->
+        <dependency>
+            <groupId>com.sap.cds</groupId>
+            <artifactId>cds-services-api</artifactId>
+        </dependency>
+
+        <!-- CAP services implementation -->
+        <dependency>
+            <groupId>com.sap.cds</groupId>
+            <artifactId>cds-services-impl</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- OData V4 adapter -->
+        <dependency>
+            <groupId>com.sap.cds</groupId>
+            <artifactId>cds-adapter-odata-v4</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- JDBC persistence feature -->
+        <dependency>
+            <groupId>com.sap.cds</groupId>
+            <artifactId>cds-feature-jdbc</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- H2 in-memory database -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>task-cap-srv</finalName>
+        <plugins>
+            <!-- CDS Maven plugin for build, generate, install -->
+            <plugin>
+                <groupId>com.sap.cds</groupId>
+                <artifactId>cds-maven-plugin</artifactId>
+                <version>2.6.0</version>
+                <executions>
+                    <!-- 1. Install @sap/cds-dk via npm (run manually if npm not in PATH) -->
+                    <execution>
+                        <id>cds-npm-install</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>install</arguments>
+                            <skip>${cds.npm.skip}</skip>
+                        </configuration>
+                    </execution>
+                    <!-- 2. Build CDS model for Java -->
+                    <execution>
+                        <id>cds-build</id>
+                        <goals>
+                            <goal>cds</goal>
+                        </goals>
+                        <configuration>
+                            <commands>
+                                <command>build --for java</command>
+                            </commands>
+                            <environmentVariables>
+                                <PATH>${env.HOME}/.nvm/versions/node/v22.11.0/bin:${env.PATH}</PATH>
+                            </environmentVariables>
+                        </configuration>
+                    </execution>
+                    <!-- 3. Generate typed Java interfaces -->
+                    <execution>
+                        <id>cds-generate</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <basePackage>cds.gen</basePackage>
+                            <codeOutputDirectory>${project.basedir}/src/gen/</codeOutputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Spring Boot repackage -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>3.2.5</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Add src/gen/java as source root -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>add-gen-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/src/gen/</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Maven compiler -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.12.1</version>
+                <configuration>
+                    <source>21</source>
+                    <target>21</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

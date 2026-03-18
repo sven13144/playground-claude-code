@@ -1,0 +1,8 @@
+.claude/
+target/
+node_modules/
+task-cap/srv/src/gen/
+task-cap/srv/src/main/resources/edmx/
+task-cap/package-lock.json
+*.class
+*.jar

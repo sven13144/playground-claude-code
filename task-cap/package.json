@@ -1,0 +1,6 @@
+{
+  "name": "task-cap",
+  "devDependencies": {
+    "@sap/cds-dk": "^7"
+  }
+}

@@ -1,0 +1,6 @@
+ID;title;description;completed
+b7e1f4c2-1234-4a56-8901-abcdef123401;Buy groceries;  🛒\n ___________\n|           |\n|  🥛 🥚 🍞  |\n|  🥦 🧅 🧄  |\n|___________|\n  Buy milk, eggs, bread\n  and fresh vegetables;false
+b7e1f4c2-1234-4a56-8901-abcdef123402;Write report;  📊 Q4 REPORT\n  ============\n  ▓▓▓▓▓▓▓▓░░  80%\n  ▓▓▓▓▓░░░░░  50%\n  ▓▓▓▓▓▓▓▓▓░  90%\n  ------------\n  Quarterly performance\n  review document;false
+b7e1f4c2-1234-4a56-8901-abcdef123403;Fix bug #42;  🐛 BUG #42\n  +--------+\n  | NullPtr|\n  | Exceptn|\n  +---+----+\n      |\n  ~~~~v~~~~\n  PAYMENT\n  MODULE\n  Null pointer exception\n  in payment processing;false
+b7e1f4c2-1234-4a56-8901-abcdef123404;Deploy to staging;  🚀 DEPLOY\n   _____\n  /     \\\n  | SHIP |\n  |  IT  |\n  \\_____/\n     |\n  ~~~*~~~\n  STAGING\n  Run full regression\n  suite before deploying;true
+b7e1f4c2-1234-4a56-8901-abcdef123405;Update documentation;  📖 API v2\n  +--------+\n  |GET  /tasks    |\n  |POST /tasks    |\n  |PUT  /tasks/id |\n  |DEL  /tasks/id |\n  +--------+\n  Update API docs\n  for v2 endpoints;true
