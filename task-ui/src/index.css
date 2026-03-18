@@ -1,0 +1,30 @@
+:root {
+  --bg:           #080b14;
+  --surface:      #0d1120;
+  --surface2:     #121829;
+  --border:       #1e2a45;
+  --violet:       #7c3aed;
+  --violet-glow:  #a855f7;
+  --cyan:         #06b6d4;
+  --cyan-glow:    #22d3ee;
+  --magenta:      #ec4899;
+  --magenta-glow: #f472b6;
+  --green:        #10b981;
+  --green-glow:   #34d399;
+  --text:         #e2e8f0;
+  --text-muted:   #64748b;
+  --font-sans:    'Space Grotesk', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#root { min-height: 100vh; }
