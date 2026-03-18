@@ -1,0 +1,13 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "task-cap/Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "java -Dspring.profiles.active=prod -jar /app/app.jar",
+    "healthcheckPath": "/odata/v4/api/",
+    "healthcheckTimeout": 60,
+    "restartPolicyType": "ON_FAILURE"
+  }
+}

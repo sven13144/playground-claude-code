@@ -6,9 +6,11 @@ import {
   MessageCircle, Send
 } from 'lucide-react'
 
-const API = '/odata/v4/api/Tasks'
-const SUGGEST_API = '/odata/v4/api/suggestTask'
-const CHAT_API = '/odata/v4/api/chatTask'
+const BASE = import.meta.env.VITE_API_URL ?? ''
+const API = `${BASE}/odata/v4/api/Tasks`
+const SUGGEST_API = `${BASE}/odata/v4/api/suggestTask`
+const CHAT_API = `${BASE}/odata/v4/api/chatTask`
+const EVENTS_URL = `${BASE}/events`
 
 const headers = { 'Content-Type': 'application/json' }
 
@@ -1031,7 +1033,7 @@ export default function App() {
   useEffect(() => { loadTasks() }, [loadTasks])
 
   useEffect(() => {
-    const es = new EventSource('/events')
+    const es = new EventSource(EVENTS_URL)
     es.addEventListener('tasks_changed', () => loadTasks())
     es.onerror = (err) => console.warn('SSE error, browser will retry:', err)
     return () => es.close()
