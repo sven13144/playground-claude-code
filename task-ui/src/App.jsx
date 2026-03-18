@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle2, Circle, Plus, Trash2, X, Zap,
-  Activity, Filter, Sparkles, Terminal, Wand2, HelpCircle
+  Activity, Filter, Sparkles, Terminal, Wand2, HelpCircle, BarChart2
 } from 'lucide-react'
 
 const API = '/odata/v4/api/Tasks'
@@ -309,6 +309,47 @@ const s = {
     color: 'var(--text)', lineHeight: 1.7, marginBottom: 16,
   },
 
+  // ── stats modal ──
+  statsModal: {
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 20, padding: 32, width: '100%', maxWidth: 900,
+    position: 'relative',
+    boxShadow: '0 0 60px rgba(6,182,212,0.2)',
+    maxHeight: '88vh', overflowY: 'auto',
+  },
+  statsGrid: {
+    display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 32,
+  },
+  table: {
+    width: '100%', borderCollapse: 'collapse', marginBottom: 32,
+    fontFamily: 'var(--font-mono)', fontSize: 11,
+  },
+  th: {
+    padding: '8px 12px', textAlign: 'left',
+    borderBottom: '1px solid var(--border)',
+    color: 'var(--text-muted)', letterSpacing: 2, textTransform: 'uppercase',
+    fontWeight: 700,
+  },
+  td: {
+    padding: '10px 12px',
+    borderBottom: '1px solid rgba(255,255,255,0.04)',
+    color: 'var(--text)', verticalAlign: 'middle',
+  },
+  barWrap: { marginBottom: 32 },
+  barLabel: {
+    fontFamily: 'var(--font-mono)', fontSize: 11,
+    color: 'var(--text-muted)', letterSpacing: 2,
+    textTransform: 'uppercase', marginBottom: 12,
+  },
+  statsBtn: {
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 10, padding: '6px 14px', cursor: 'pointer',
+    color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12,
+    fontWeight: 700, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6,
+    transition: 'all 0.2s',
+  },
+
   // ── toast ──
   toast: (type) => ({
     position: 'fixed', bottom: 32, right: 32, zIndex: 200,
@@ -610,6 +651,173 @@ function HelpModal({ onClose }) {
   )
 }
 
+function BarChart({ data, color, valueKey, labelKey }) {
+  const max = Math.max(...data.map(d => d[valueKey]), 1)
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80 }}>
+      {data.map((d, i) => (
+        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)' }}>
+            {d[valueKey] || ''}
+          </div>
+          <motion.div
+            style={{ width: '100%', background: color, borderRadius: '4px 4px 0 0', minHeight: 2 }}
+            initial={{ height: 0 }}
+            animate={{ height: `${(d[valueKey] / max) * 60}px` }}
+            transition={{ type: 'spring', stiffness: 200, damping: 20, delay: i * 0.03 }}
+          />
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+            {d[labelKey]}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function fmtDuration(ms) {
+  if (ms == null) return '—'
+  const s = Math.floor(ms / 1000)
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ${s % 60}s`
+  const h = Math.floor(m / 60)
+  return `${h}h ${m % 60}m`
+}
+
+function fmtTime(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    + ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
+function bucketByDay(tasks, dateField) {
+  const counts = {}
+  tasks.forEach(t => {
+    if (!t[dateField]) return
+    const day = t[dateField].slice(0, 10)
+    counts[day] = (counts[day] || 0) + 1
+  })
+  return Object.entries(counts).sort().map(([day, count]) => ({
+    label: day.slice(5), // MM-DD
+    count,
+  }))
+}
+
+function StatsModal({ tasks, onClose }) {
+  const completed = tasks.filter(t => t.completed && t.completedAt && t.createdAt)
+  const durations = completed.map(t => new Date(t.completedAt) - new Date(t.createdAt))
+  const avgMs = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null
+  const minMs = durations.length ? Math.min(...durations) : null
+  const maxMs = durations.length ? Math.max(...durations) : null
+
+  const createdByDay  = bucketByDay(tasks, 'createdAt')
+  const completedByDay = bucketByDay(completed, 'completedAt')
+
+  const tableRows = [...tasks].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+  return (
+    <motion.div style={s.backdrop}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <motion.div style={s.statsModal}
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 28 }}>
+
+        <div style={{ position: 'absolute', inset: 0, borderRadius: 20, overflow: 'hidden', pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+            background: 'linear-gradient(90deg,transparent,var(--cyan),var(--violet),transparent)' }} />
+        </div>
+
+        <button style={s.closeBtn} onClick={onClose}><X size={18} /></button>
+        <div style={s.modalTitle}>// STATISTICS</div>
+
+        {/* summary cards */}
+        <div style={s.statsGrid}>
+          <div style={s.statCard('var(--cyan-glow)')}>
+            <div style={s.statAccent('var(--cyan-glow)')} />
+            <div style={s.statNum('var(--cyan-glow)')}>{tasks.length}</div>
+            <div style={s.statLabel}>TOTAL TASKS</div>
+          </div>
+          <div style={s.statCard('var(--violet-glow)')}>
+            <div style={s.statAccent('var(--violet-glow)')} />
+            <div style={s.statNum('var(--violet-glow)')}>{fmtDuration(avgMs)}</div>
+            <div style={s.statLabel}>AVG TIME OPEN</div>
+          </div>
+          <div style={s.statCard('var(--green-glow)')}>
+            <div style={s.statAccent('var(--green-glow)')} />
+            <div style={s.statNum('var(--green-glow)')}>{fmtDuration(minMs)}</div>
+            <div style={s.statLabel}>FASTEST CLOSE</div>
+          </div>
+        </div>
+
+        {/* charts */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 32 }}>
+          <div style={s.barWrap}>
+            <div style={s.barLabel}>Tasks Created per Day</div>
+            {createdByDay.length
+              ? <BarChart data={createdByDay} color="var(--violet)" valueKey="count" labelKey="label" />
+              : <div style={{ ...s.helpSection, paddingTop: 8 }}>No data yet</div>}
+          </div>
+          <div style={s.barWrap}>
+            <div style={s.barLabel}>Tasks Completed per Day</div>
+            {completedByDay.length
+              ? <BarChart data={completedByDay} color="var(--green)" valueKey="count" labelKey="label" />
+              : <div style={{ ...s.helpSection, paddingTop: 8 }}>No data yet</div>}
+          </div>
+        </div>
+
+        {/* table */}
+        <div style={s.barLabel}>All Tasks</div>
+        <table style={s.table}>
+          <thead>
+            <tr>
+              <th style={s.th}>Title</th>
+              <th style={s.th}>Created</th>
+              <th style={s.th}>Completed</th>
+              <th style={s.th}>Duration Open</th>
+              <th style={s.th}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows.map(t => {
+              const dur = t.completedAt && t.createdAt
+                ? new Date(t.completedAt) - new Date(t.createdAt)
+                : null
+              return (
+                <tr key={t.ID}>
+                  <td style={{ ...s.td, maxWidth: 220, overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</td>
+                  <td style={{ ...s.td, color: 'var(--text-muted)' }}>{fmtTime(t.createdAt)}</td>
+                  <td style={{ ...s.td, color: 'var(--text-muted)' }}>{fmtTime(t.completedAt)}</td>
+                  <td style={{ ...s.td, color: dur != null ? 'var(--cyan-glow)' : 'var(--text-muted)' }}>
+                    {fmtDuration(dur)}
+                  </td>
+                  <td style={s.td}>
+                    <span style={s.statusBadge(t.completed)}>
+                      {t.completed ? '✓ DONE' : '◉ PENDING'}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+
+        <div style={{ ...s.helpSection, marginBottom: 0 }}>
+          Slowest close: <span style={{ color: 'var(--magenta-glow)' }}>{fmtDuration(maxMs)}</span>
+          &nbsp;·&nbsp;
+          {completed.length} of {tasks.length} tasks closed with timing data
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // ─── main app ───────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -617,6 +825,7 @@ export default function App() {
   const [filter, setFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [showStats, setShowStats] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
 
@@ -646,7 +855,11 @@ export default function App() {
   }, [loadTasks])
 
   const handleToggle = async (task) => {
-    const updated = { completed: !task.completed }
+    const completing = !task.completed
+    const updated = {
+      completed: completing,
+      ...(completing ? { completedAt: new Date().toISOString() } : { completedAt: null }),
+    }
     setTasks(prev => prev.map(t => t.ID === task.ID ? { ...t, ...updated } : t))
     try {
       await apiFetch(`${API}(${task.ID})`, { method: 'PATCH', body: JSON.stringify(updated) })
@@ -711,6 +924,12 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <motion.button style={s.statsBtn}
+              onClick={() => setShowStats(true)}
+              whileHover={{ scale: 1.04, borderColor: 'var(--cyan)', color: 'var(--cyan-glow)' }}
+              whileTap={{ scale: 0.96 }}>
+              <BarChart2 size={13} /> STATS
+            </motion.button>
             <motion.button style={s.helpBtn}
               onClick={() => setShowHelp(true)}
               whileHover={{ scale: 1.04, borderColor: 'var(--violet)', color: 'var(--violet-glow)' }}
@@ -772,6 +991,11 @@ export default function App() {
           </motion.div>
         )}
       </div>
+
+      {/* stats modal */}
+      <AnimatePresence>
+        {showStats && <StatsModal tasks={tasks} onClose={() => setShowStats(false)} />}
+      </AnimatePresence>
 
       {/* modals */}
       <AnimatePresence>

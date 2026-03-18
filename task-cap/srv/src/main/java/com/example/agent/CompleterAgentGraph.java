@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -69,7 +70,10 @@ public class CompleterAgentGraph {
                 log.info("Completer: no incomplete tasks found, skipping");
                 return Map.of();
             }
-            String patchBody = mapper.writeValueAsString(Map.of("completed", true));
+            String patchBody = mapper.writeValueAsString(Map.of(
+                    "completed",   true,
+                    "completedAt", Instant.now().toString()
+            ));
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(ODATA_BASE + "(" + id + ")"))
                     .header("Content-Type", "application/json")
