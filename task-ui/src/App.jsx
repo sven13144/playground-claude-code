@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle2, Circle, Plus, Trash2, X, Zap,
   Activity, Filter, Sparkles, Terminal, Wand2, HelpCircle, BarChart2,
-  MessageCircle, Send
+  MessageCircle, Send, Presentation
 } from 'lucide-react'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
@@ -282,6 +282,13 @@ const s = {
     color: 'var(--text-muted)',
   },
   helpBtn: {
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 10, padding: '6px 14px', cursor: 'pointer',
+    color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12,
+    fontWeight: 700, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6,
+    transition: 'all 0.2s',
+  },
+  aboutBtn: {
     background: 'var(--surface)', border: '1px solid var(--border)',
     borderRadius: 10, padding: '6px 14px', cursor: 'pointer',
     color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12,
@@ -1137,6 +1144,12 @@ export default function App() {
               whileHover={{ scale: 1.04, borderColor: 'var(--cyan)', color: 'var(--cyan-glow)' }}
               whileTap={{ scale: 0.96 }}>
               <BarChart2 size={13} /> STATS
+            </motion.button>
+            <motion.button style={s.aboutBtn}
+              onClick={() => window.open('/TaskBoard_PitchDeck.pptx', '_blank')}
+              whileHover={{ scale: 1.04, borderColor: 'var(--magenta)', color: 'var(--magenta-glow)' }}
+              whileTap={{ scale: 0.96 }}>
+              <Presentation size={13} /> ABOUT
             </motion.button>
             <motion.button style={s.helpBtn}
               onClick={() => setShowHelp(true)}
